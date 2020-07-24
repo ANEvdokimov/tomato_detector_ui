@@ -4,7 +4,10 @@ import main_window
 import sys
 import cv2
 import numpy as np
+import json
 import tomato_detector
+from settings import Settings
+from settings_encoder import SettingsEncoder
 
 
 class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
@@ -41,6 +44,9 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
         self.chbx_splitFruit.stateChanged.connect(self.chbx_splitFruit_handler)
 
         self.btn_open.clicked.connect(self.btn_open_handler)
+        self.btn_saveSettings.clicked.connect(self.btn_save_settings_handler)
+
+        self.load_settings()
 
     def btn_open_handler(self):
         file_name = QtWidgets.QFileDialog.getOpenFileName(self, "Открыть")[0]
@@ -61,6 +67,78 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
             raise IOError("Ошибка при открытии изображения.")
         self.source_image_bgr = opened_image
         self.redraw_image()
+
+    def btn_save_settings_handler(self):
+        self.save_settings()
+
+    def save_settings(self):
+        settings = Settings(
+            self.sbx_minH.value(),
+            self.sbx_minS.value(),
+            self.sbx_minV.value(),
+            self.sbx_maxH.value(),
+            self.sbx_maxS.value(),
+            self.sbx_maxV.value(),
+            self.chbx_whiteBalance.isChecked(),
+            self.chbx_contrast.isChecked(),
+            self.chbx_circularity.isChecked(),
+            self.sld_minCircularity.value() / 20,
+            self.sld_maxCircularity.value() / 20,
+            self.chbx_convexity.isChecked(),
+            self.sld_minConvexity.value() / 20,
+            self.sld_maxConvexity.value() / 20,
+            self.chbx_inertia.isChecked(),
+            self.sld_minInertia.value() / 20,
+            self.sld_maxInertia.value() / 20,
+            self.chbx_area.isChecked(),
+            self.sbx_minArea.value(),
+            self.sbx_maxArea.value(),
+            self.chbx_splitFruit.isChecked()
+        )
+
+        with open("settings.json", "w") as file:
+            file.write(SettingsEncoder().encode(settings))
+
+        message_box = QtWidgets.QMessageBox()
+        message_box.setText("Настройки успешно сохранены")
+        message_box.setWindowTitle("Статус сохранения")
+        message_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
+        message_box.exec()
+
+    def load_settings(self):
+        try:
+            with open("settings.json", "r") as file:
+                settings = Settings(**json.load(file))
+
+                self.sbx_minH.setValue(settings.minH)
+                self.sbx_minS.setValue(settings.minS)
+                self.sbx_minV.setValue(settings.minV)
+                self.sbx_maxH.setValue(settings.maxH)
+                self.sbx_maxS.setValue(settings.maxS)
+                self.sbx_maxV.setValue(settings.maxV)
+                self.chbx_whiteBalance.setChecked(settings.whiteBalance)
+                self.chbx_contrast.setChecked(settings.contrast)
+                self.chbx_circularity.setChecked(settings.filterByCircularity)
+                self.sld_minCircularity.setValue(int(settings.minCircularity * 20))
+                self.sld_maxCircularity.setValue(int(settings.maxCircularity * 20))
+                self.chbx_convexity.setChecked(settings.filterByConvexity)
+                self.sld_minConvexity.setValue(int(settings.minConvexity * 20))
+                self.sld_maxConvexity.setValue(int(settings.maxConvexity * 20))
+                self.chbx_inertia.setChecked(settings.filterByInertia)
+                self.sld_minInertia.setValue(int(settings.minInertia * 20))
+                self.sld_maxInertia.setValue(int(settings.maxInertia * 20))
+                self.chbx_area.setChecked(settings.filterByArea)
+                self.sbx_minArea.setValue(settings.minArea)
+                self.sbx_maxArea.setValue(settings.maxArea)
+                self.chbx_splitFruit.setChecked(settings.splitFruit)
+
+                self.chbx_circularity_handler()
+                self.chbx_convexity_handler()
+                self.chbx_inertia_handler()
+                self.chbx_area_handler()
+
+        except FileNotFoundError:
+            pass
 
     def sbx_colors_handler(self):
         self.redraw_image()
