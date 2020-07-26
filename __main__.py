@@ -1,5 +1,7 @@
 from PyQt5 import QtWidgets
 from PyQt5.QtGui import QPixmap, QImage
+from PyQt5.QtCore import QTimer
+from PyQt5.QtMultimedia import QCameraInfo
 import main_window
 import sys
 import cv2
@@ -14,9 +16,15 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
     source_image_bgr = []
 
     def __init__(self):
+        self.vc = None
+
         super(MainWindow, self).__init__()
         self.setupUi(self)
         # self.setFixedSize(672, 645)
+
+        self.rbtn_input_group = QtWidgets.QButtonGroup()
+        self.rbtn_input_group.addButton(self.rbtn_camera)
+        self.rbtn_input_group.addButton(self.rbtn_image)
 
         self.sbx_minH.valueChanged.connect(self.sbx_colors_handler)
         self.sbx_minS.valueChanged.connect(self.sbx_colors_handler)
@@ -46,7 +54,48 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
         self.btn_open.clicked.connect(self.btn_open_handler)
         self.btn_saveSettings.clicked.connect(self.btn_save_settings_handler)
 
+        self.rbtn_camera.clicked.connect(self.rbtn_input_handler)
+        self.rbtn_image.clicked.connect(self.rbtn_input_handler)
+
+        self.btn_catch.clicked.connect(self.btn_catch_handler)
+        self.btn_continue.clicked.connect(self.btn_continue_handler)
+
+        self.rbtn_input_handler()
+        cameras = QCameraInfo.availableCameras()
+        for camera in cameras:
+            self.cmbx_cameras.addItem(camera.description())
+        self.camera_id = 0
+
+        self.cmbx_cameras.currentIndexChanged.connect(self.cmbx_cameras_handler)
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.next_frame)
+
         self.load_settings()
+
+    def open_camera(self):
+        self.vc = cv2.VideoCapture(self.camera_id)
+
+        if not self.vc.isOpened():
+            msgBox = QtWidgets.QMessageBox()
+            msgBox.setText("Ошибка при открытии камеры.")
+            msgBox.exec_()
+            return
+
+        self.timer.start(int(1000. / 24))
+
+    def stop_camera(self):
+        if self.vc is not None:
+            self.timer.stop()
+            self.vc.release()
+
+    def next_frame(self):
+        rval, frame = self.vc.read()
+        self.source_image_bgr = frame
+        frame_resized = self.resize_image_for_frame(frame, self.lbl_image.width(), self.lbl_image.height())
+        self.lbl_image.setPixmap(
+            QPixmap.fromImage(QImage(frame_resized.data, frame_resized.shape[1], frame_resized.shape[0],
+                              frame_resized.strides[0], QImage.Format_BGR888)))
 
     def btn_open_handler(self):
         file_name = QtWidgets.QFileDialog.getOpenFileName(self, "Открыть")[0]
@@ -140,6 +189,22 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
         except FileNotFoundError:
             pass
 
+    def rbtn_input_handler(self):
+        if self.rbtn_image.isChecked():
+            self.cmbx_cameras.setEnabled(False)
+            self.btn_catch.setEnabled(False)
+            self.btn_continue.setEnabled(False)
+            self.lbl_fileName.setEnabled(True)
+            self.btn_open.setEnabled(True)
+            self.stop_camera()
+        elif self.rbtn_camera.isChecked():
+            self.cmbx_cameras.setEnabled(True)
+            self.btn_catch.setEnabled(True)
+            self.btn_continue.setEnabled(True)
+            self.lbl_fileName.setEnabled(False)
+            self.btn_open.setEnabled(False)
+            self.open_camera()
+
     def sbx_colors_handler(self):
         self.redraw_image()
 
@@ -232,6 +297,19 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
         self.sbx_maxArea.setEnabled(is_enable)
 
         self.redraw_image()
+
+    def btn_catch_handler(self):
+        self.stop_camera()
+        self.redraw_image()
+
+    def btn_continue_handler(self):
+        if not self.vc.isOpened():
+            self.open_camera()
+
+    def cmbx_cameras_handler(self):
+        self.camera_id = self.cmbx_cameras.currentIndex()
+        self.stop_camera()
+        self.open_camera()
 
     def redraw_image(self):
         if len(self.source_image_bgr) != 0:
