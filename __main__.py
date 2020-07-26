@@ -13,14 +13,13 @@ from settings_encoder import SettingsEncoder
 
 
 class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
-    source_image_bgr = []
+    source_image_bgr = None
+    vc = None
 
     def __init__(self):
-        self.vc = None
-
         super(MainWindow, self).__init__()
         self.setupUi(self)
-        # self.setFixedSize(672, 645)
+        self.setFixedSize(847, 749)
 
         self.rbtn_input_group = QtWidgets.QButtonGroup()
         self.rbtn_input_group.addButton(self.rbtn_camera)
@@ -95,7 +94,7 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
         frame_resized = self.resize_image_for_frame(frame, self.lbl_image.width(), self.lbl_image.height())
         self.lbl_image.setPixmap(
             QPixmap.fromImage(QImage(frame_resized.data, frame_resized.shape[1], frame_resized.shape[0],
-                              frame_resized.strides[0], QImage.Format_BGR888)))
+                                     frame_resized.strides[0], QImage.Format_BGR888)))
 
     def btn_open_handler(self):
         file_name = QtWidgets.QFileDialog.getOpenFileName(self, "Открыть")[0]
@@ -305,6 +304,7 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
     def btn_continue_handler(self):
         if not self.vc.isOpened():
             self.open_camera()
+            self.source_image_bgr = None
 
     def cmbx_cameras_handler(self):
         self.camera_id = self.cmbx_cameras.currentIndex()
@@ -312,7 +312,7 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
         self.open_camera()
 
     def redraw_image(self):
-        if len(self.source_image_bgr) != 0:
+        if self.source_image_bgr is not None and not self.vc.isOpened():
 
             color_range = {"fruit": {
                 "min": (self.sbx_minH.value(), self.sbx_minS.value(), self.sbx_minV.value()),
@@ -352,6 +352,20 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
             self.lbl_image.setPixmap(QPixmap.fromImage(
                 QImage(resized_image_bgr.data, resized_image_bgr.shape[1], resized_image_bgr.shape[0],
                        resized_image_bgr.strides[0], QImage.Format_BGR888)))
+
+            self.output_keypoints_text(keypoints["fruit"])
+
+    def output_keypoints_text(self, keypoints):
+        self.pte_output.clear()
+        self.pte_output.appendPlainText("Количество найденных объектов: " + str(len(keypoints)))
+
+        index = 0
+        for fruit in keypoints:
+            self.pte_output.appendPlainText("")
+            self.pte_output.appendPlainText("Index: " + str(index))
+            self.pte_output.appendPlainText(
+                "Расположение на изображении: " + str(round(fruit.pt[0])) + ":" + str(round(fruit.pt[1])))
+            index += 1
 
     @staticmethod
     def resize_image_for_frame(image, frame_width, frame_height):
