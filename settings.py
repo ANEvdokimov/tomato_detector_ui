@@ -27,9 +27,11 @@ class Settings:
 
     splitFruit = False
 
+    min_distance = 0
+
     def __init__(self, minH, minS, minV, maxH, maxS, maxV, whiteBalance, contrast, filterByCircularity, minCircularity,
                  maxCircularity, filterByConvexity, minConvexity, maxConvexity, filterByInertia, minInertia,
-                 maxInertia, filterByArea, minArea, maxArea, splitFruit):
+                 maxInertia, filterByArea, minArea, maxArea, splitFruit, min_distance):
         self.minH = minH
         self.minS = minS
         self.minV = minV
@@ -57,3 +59,5 @@ class Settings:
         self.maxArea = maxArea
 
         self.splitFruit = splitFruit
+
+        self.min_distance = min_distance

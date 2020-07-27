@@ -49,6 +49,7 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
         self.chbx_whiteBalance.stateChanged.connect(self.chbx_white_balance_handler)
         self.chbx_contrast.stateChanged.connect(self.chbx_contrast_handler)
         self.chbx_splitFruit.stateChanged.connect(self.chbx_splitFruit_handler)
+        self.sbx_minDistance.valueChanged.connect(self.sbx_min_distance_handler)
 
         self.btn_open.clicked.connect(self.btn_open_handler)
         self.btn_saveSettings.clicked.connect(self.btn_save_settings_handler)
@@ -141,7 +142,8 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
             self.chbx_area.isChecked(),
             self.sbx_minArea.value(),
             self.sbx_maxArea.value(),
-            self.chbx_splitFruit.isChecked()
+            self.chbx_splitFruit.isChecked(),
+            self.sbx_minDistance.value()
         )
 
         with open("settings.json", "w") as file:
@@ -156,34 +158,43 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
     def load_settings(self):
         try:
             with open("settings.json", "r") as file:
-                settings = Settings(**json.load(file))
+                try:
+                    settings = Settings(**json.load(file))
+                except TypeError:
+                    message_box = QtWidgets.QMessageBox()
+                    message_box.setText("Ошибка при загрузке настроек из файла \"settings.json\".")
+                    message_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
+                    message_box.exec()
+                    return
 
-                self.sbx_minH.setValue(settings.minH)
-                self.sbx_minS.setValue(settings.minS)
-                self.sbx_minV.setValue(settings.minV)
-                self.sbx_maxH.setValue(settings.maxH)
-                self.sbx_maxS.setValue(settings.maxS)
-                self.sbx_maxV.setValue(settings.maxV)
-                self.chbx_whiteBalance.setChecked(settings.whiteBalance)
-                self.chbx_contrast.setChecked(settings.contrast)
-                self.chbx_circularity.setChecked(settings.filterByCircularity)
-                self.sld_minCircularity.setValue(int(settings.minCircularity * 20))
-                self.sld_maxCircularity.setValue(int(settings.maxCircularity * 20))
-                self.chbx_convexity.setChecked(settings.filterByConvexity)
-                self.sld_minConvexity.setValue(int(settings.minConvexity * 20))
-                self.sld_maxConvexity.setValue(int(settings.maxConvexity * 20))
-                self.chbx_inertia.setChecked(settings.filterByInertia)
-                self.sld_minInertia.setValue(int(settings.minInertia * 20))
-                self.sld_maxInertia.setValue(int(settings.maxInertia * 20))
-                self.chbx_area.setChecked(settings.filterByArea)
-                self.sbx_minArea.setValue(settings.minArea)
-                self.sbx_maxArea.setValue(settings.maxArea)
-                self.chbx_splitFruit.setChecked(settings.splitFruit)
+            self.sbx_minH.setValue(settings.minH)
+            self.sbx_minS.setValue(settings.minS)
+            self.sbx_minV.setValue(settings.minV)
+            self.sbx_maxH.setValue(settings.maxH)
+            self.sbx_maxS.setValue(settings.maxS)
+            self.sbx_maxV.setValue(settings.maxV)
+            self.chbx_whiteBalance.setChecked(settings.whiteBalance)
+            self.chbx_contrast.setChecked(settings.contrast)
+            self.chbx_circularity.setChecked(settings.filterByCircularity)
+            self.sld_minCircularity.setValue(int(settings.minCircularity * 20))
+            self.sld_maxCircularity.setValue(int(settings.maxCircularity * 20))
+            self.chbx_convexity.setChecked(settings.filterByConvexity)
+            self.sld_minConvexity.setValue(int(settings.minConvexity * 20))
+            self.sld_maxConvexity.setValue(int(settings.maxConvexity * 20))
+            self.chbx_inertia.setChecked(settings.filterByInertia)
+            self.sld_minInertia.setValue(int(settings.minInertia * 20))
+            self.sld_maxInertia.setValue(int(settings.maxInertia * 20))
+            self.chbx_area.setChecked(settings.filterByArea)
+            self.sbx_minArea.setValue(settings.minArea)
+            self.sbx_maxArea.setValue(settings.maxArea)
+            self.chbx_splitFruit.setChecked(settings.splitFruit)
+            self.sbx_minDistance.setValue(settings.min_distance)
 
-                self.chbx_circularity_handler()
-                self.chbx_convexity_handler()
-                self.chbx_inertia_handler()
-                self.chbx_area_handler()
+            self.chbx_circularity_handler()
+            self.chbx_convexity_handler()
+            self.chbx_inertia_handler()
+            self.chbx_area_handler()
+            self.chbx_splitFruit_handler()
 
         except FileNotFoundError:
             pass
@@ -214,6 +225,15 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
         self.redraw_image()
 
     def chbx_splitFruit_handler(self):
+        if self.chbx_splitFruit.isChecked():
+            self.lbl_minDistance.setEnabled(True)
+            self.sbx_minDistance.setEnabled(True)
+        else:
+            self.lbl_minDistance.setEnabled(False)
+            self.sbx_minDistance.setEnabled(False)
+        self.redraw_image()
+
+    def sbx_min_distance_handler(self):
         self.redraw_image()
 
     def sld_min_circularity_handler(self):
@@ -312,48 +332,50 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
         self.open_camera()
 
     def redraw_image(self):
-        if self.source_image_bgr is not None and not self.vc.isOpened():
+        if self.source_image_bgr is not None:
+            if self.vc is None or not self.vc.isOpened():
 
-            color_range = {"fruit": {
-                "min": (self.sbx_minH.value(), self.sbx_minS.value(), self.sbx_minV.value()),
-                "max": (self.sbx_maxH.value(), self.sbx_maxS.value(), self.sbx_maxV.value())}}
+                color_range = {"fruit": {
+                    "min": (self.sbx_minH.value(), self.sbx_minS.value(), self.sbx_minV.value()),
+                    "max": (self.sbx_maxH.value(), self.sbx_maxS.value(), self.sbx_maxV.value())}}
 
-            sbd_params = cv2.SimpleBlobDetector_Params()
-            sbd_params.filterByColor = False
-            sbd_params.filterByCircularity = self.chbx_circularity.isChecked()
-            if self.chbx_circularity.isChecked():
-                sbd_params.maxCircularity = self.sld_maxCircularity.value() / 20
-                sbd_params.minCircularity = self.sld_minCircularity.value() / 20
-            sbd_params.filterByConvexity = self.chbx_convexity.isChecked()
-            if self.chbx_convexity.isChecked():
-                sbd_params.minConvexity = self.sld_minConvexity.value() / 20
-                sbd_params.maxConvexity = self.sld_maxConvexity.value() / 20
-            sbd_params.filterByInertia = self.chbx_inertia.isChecked()
-            if self.chbx_inertia.isChecked():
-                sbd_params.minInertiaRatio = self.sld_minInertia.value() / 20
-                sbd_params.maxInertiaRatio = self.sld_maxInertia.value() / 20
-            sbd_params.filterByArea = self.chbx_area.isChecked()
-            if self.chbx_area.isChecked():
-                sbd_params.minArea = self.sbx_minArea.value()
-                sbd_params.maxArea = self.sbx_maxArea.value()
+                sbd_params = cv2.SimpleBlobDetector_Params()
+                sbd_params.filterByColor = False
+                sbd_params.filterByCircularity = self.chbx_circularity.isChecked()
+                if self.chbx_circularity.isChecked():
+                    sbd_params.maxCircularity = self.sld_maxCircularity.value() / 20
+                    sbd_params.minCircularity = self.sld_minCircularity.value() / 20
+                sbd_params.filterByConvexity = self.chbx_convexity.isChecked()
+                if self.chbx_convexity.isChecked():
+                    sbd_params.minConvexity = self.sld_minConvexity.value() / 20
+                    sbd_params.maxConvexity = self.sld_maxConvexity.value() / 20
+                sbd_params.filterByInertia = self.chbx_inertia.isChecked()
+                if self.chbx_inertia.isChecked():
+                    sbd_params.minInertiaRatio = self.sld_minInertia.value() / 20
+                    sbd_params.maxInertiaRatio = self.sld_maxInertia.value() / 20
+                sbd_params.filterByArea = self.chbx_area.isChecked()
+                if self.chbx_area.isChecked():
+                    sbd_params.minArea = self.sbx_minArea.value()
+                    sbd_params.maxArea = self.sbx_maxArea.value()
 
-            keypoints, mask = tomato_detector.detect_in_image(self.source_image_bgr,
-                                                              color_range,
-                                                              self.chbx_contrast.isChecked(),
-                                                              self.chbx_whiteBalance.isChecked(),
-                                                              self.chbx_splitFruit.isChecked(),
-                                                              sbd_params)
+                keypoints, mask = tomato_detector.detect_in_image(self.source_image_bgr,
+                                                                  color_range,
+                                                                  self.chbx_contrast.isChecked(),
+                                                                  self.chbx_whiteBalance.isChecked(),
+                                                                  self.chbx_splitFruit.isChecked(),
+                                                                  sbd_params,
+                                                                  self.sbx_minDistance.value())
 
-            result_image_bgr = cv2.drawKeypoints(self.source_image_bgr, keypoints["fruit"], np.array([]), (255, 0, 0),
-                                                 cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+                result_image_bgr = cv2.drawKeypoints(self.source_image_bgr, keypoints["fruit"], np.array([]), (255, 0, 0),
+                                                     cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
-            resized_image_bgr = self.resize_image_for_frame(result_image_bgr, self.lbl_image.width(),
-                                                            self.lbl_image.height())
-            self.lbl_image.setPixmap(QPixmap.fromImage(
-                QImage(resized_image_bgr.data, resized_image_bgr.shape[1], resized_image_bgr.shape[0],
-                       resized_image_bgr.strides[0], QImage.Format_BGR888)))
+                resized_image_bgr = self.resize_image_for_frame(result_image_bgr, self.lbl_image.width(),
+                                                                self.lbl_image.height())
+                self.lbl_image.setPixmap(QPixmap.fromImage(
+                    QImage(resized_image_bgr.data, resized_image_bgr.shape[1], resized_image_bgr.shape[0],
+                           resized_image_bgr.strides[0], QImage.Format_BGR888)))
 
-            self.output_keypoints_text(keypoints["fruit"])
+                self.output_keypoints_text(keypoints["fruit"])
 
     def output_keypoints_text(self, keypoints):
         self.pte_output.clear()
