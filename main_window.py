@@ -253,7 +253,7 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "Tomato detector ui"))
         self.lbl_minConvexity.setText(_translate("MainWindow", "0.0"))
         self.chbx_contrast.setText(_translate("MainWindow", "Контраст"))
         self.lbl_maxConvexity_name.setText(_translate("MainWindow", "max"))

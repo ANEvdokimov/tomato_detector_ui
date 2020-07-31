@@ -1,6 +1,6 @@
 from PyQt5 import QtWidgets
 from PyQt5.QtGui import QPixmap, QImage
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtMultimedia import QCameraInfo
 import main_window
 import sys
@@ -92,10 +92,11 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
     def next_frame(self):
         rval, frame = self.vc.read()
         self.source_image_bgr = frame
-        frame_resized = self.resize_image_for_frame(frame, self.lbl_image.width(), self.lbl_image.height())
-        self.lbl_image.setPixmap(
-            QPixmap.fromImage(QImage(frame_resized.data, frame_resized.shape[1], frame_resized.shape[0],
-                                     frame_resized.strides[0], QImage.Format_BGR888)))
+
+        pix_map = QPixmap.fromImage(
+            QImage(frame.data, frame.shape[1], frame.shape[0], frame.strides[0], QImage.Format_BGR888))
+
+        self.lbl_image.setPixmap(pix_map.scaled(self.lbl_image.width(), self.lbl_image.height(), Qt.KeepAspectRatio))
 
     def btn_open_handler(self):
         file_name = QtWidgets.QFileDialog.getOpenFileName(self, "Открыть")[0]
@@ -366,14 +367,16 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
                                                                   sbd_params,
                                                                   self.sbx_minDistance.value())
 
-                result_image_bgr = cv2.drawKeypoints(self.source_image_bgr, keypoints["fruit"], np.array([]), (255, 0, 0),
+                result_image_bgr = cv2.drawKeypoints(self.source_image_bgr, keypoints["fruit"], np.array([]),
+                                                     (255, 0, 0),
                                                      cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
-                resized_image_bgr = self.resize_image_for_frame(result_image_bgr, self.lbl_image.width(),
-                                                                self.lbl_image.height())
-                self.lbl_image.setPixmap(QPixmap.fromImage(
-                    QImage(resized_image_bgr.data, resized_image_bgr.shape[1], resized_image_bgr.shape[0],
-                           resized_image_bgr.strides[0], QImage.Format_BGR888)))
+                pix_map = QPixmap.fromImage(
+                    QImage(result_image_bgr.data, result_image_bgr.shape[1], result_image_bgr.shape[0],
+                           result_image_bgr.strides[0], QImage.Format_BGR888))
+
+                self.lbl_image.setPixmap(
+                    pix_map.scaled(self.lbl_image.width(), self.lbl_image.height(), Qt.KeepAspectRatio))
 
                 self.output_keypoints_text(keypoints["fruit"])
 
@@ -388,23 +391,6 @@ class MainWindow(QtWidgets.QMainWindow, main_window.Ui_MainWindow):
             self.pte_output.appendPlainText(
                 "Расположение на изображении: " + str(round(fruit.pt[0])) + ":" + str(round(fruit.pt[1])))
             index += 1
-
-    @staticmethod
-    def resize_image_for_frame(image, frame_width, frame_height):
-        image_width = image.shape[1]
-        image_height = image.shape[0]
-
-        if image_height > frame_height or image_width > frame_width:
-            width_diff = image_width / frame_width
-            height_diff = image_height / frame_height
-        else:
-            width_diff = frame_width / image_width
-            height_diff = frame_height / image_height
-
-        if width_diff > height_diff:
-            return cv2.resize(image, (round(image_width / width_diff), round(image_height / width_diff)))
-        else:
-            return cv2.resize(image, (round(image_width / height_diff), round(image_height / height_diff)))
 
 
 if __name__ == "__main__":
